@@ -7,7 +7,9 @@ from pprint import pprint
 from pydub import AudioSegment
 import io
 
-character = "Mika"  #첫단어 대문자로해야함 (wiki주소 이슈)
+# from util.config import Config
+
+character = "Saki"  #첫단어 대문자로해야함 (wiki주소 이슈)
 
 BASE_URL = "https://bluearchive.wiki"
 PAGE_URL = f"{BASE_URL}/wiki/{character}/audio"

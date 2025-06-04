@@ -3,7 +3,7 @@ import requests
 import os
 
 # 오디오 파일 다운로드 함수 (MP3 다운로드 후 WAV로 변환)
-def download_audio(url, filename, dir=download):
+def download_audio(url, filename, dir, headers, temp):
     try:
         audio_response = requests.get(url, headers=headers)
         if audio_response.status_code == 200:
@@ -33,7 +33,7 @@ def download_audio(url, filename, dir=download):
         return False, None, None
 
 # 여러 오디오 파일을 하나로 합치는 함수 (WAV 형식으로)
-def combine_audio_from_urls(urls, output_filename):
+def combine_audio_from_urls(urls, output_filename, temp):
     try:
         if not urls:
             return False, None, None

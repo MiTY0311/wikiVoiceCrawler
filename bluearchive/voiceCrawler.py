@@ -1,13 +1,15 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-import os
+import os, sys
 import time
 from pprint import pprint
 from pydub import AudioSegment
 import io
 
-# from util.config import Config
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from util.config import Config
+from util.audioHandler import download_audio, combine_audio_from_urls
 
 character = "Saki"  #첫단어 대문자로해야함 (wiki주소 이슈)
 
@@ -18,98 +20,25 @@ headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"   ## 오디오 다운받을려면 필요함
 }
 
-response = requests.get(PAGE_URL, headers=headers)
-soup = BeautifulSoup(response.text, "html.parser")
-
-download = f"{character}_audio"
+download = f"output/{character}_audio"
 os.makedirs(download, exist_ok=True)
-temp = f"{character}_temp"
+temp = f"output/{character}_temp"
 os.makedirs(temp, exist_ok=True)
 
 # 데이터셋 파일 생성
 dataset_file = f"{character}_dataset.txt"
 
-# 오디오 파일 다운로드 함수 (MP3 다운로드 후 WAV로 변환)
-def download_audio(url, filename, dir=download):
-    try:
-        audio_response = requests.get(url, headers=headers)
-        if audio_response.status_code == 200:
-            # MP3 파일 임시 저장
-            temp_mp3_path = os.path.join(temp, f"temp_{filename}")
-            with open(temp_mp3_path, 'wb') as f:
-                f.write(audio_response.content)
-            
-            # WAV 파일명 생성 (확장자 변경)
-            wav_filename = os.path.splitext(filename)[0] + ".wav"
-            wav_path = os.path.join(dir, wav_filename)
-            
-            # MP3를 WAV로 변환
-            audio = AudioSegment.from_mp3(temp_mp3_path)
-            audio.export(wav_path, format="wav")
-            
-            # 임시 MP3 파일 삭제
-            os.remove(temp_mp3_path)
-            
-            print(f"다운로드 및 WAV 변환 완료: {wav_filename}")
-            return True, wav_path, wav_filename
-        else:
-            print(f"다운로드 실패 (상태 코드: {audio_response.status_code}): {url}")
-            return False, None, None
-    except Exception as e:
-        print(f"다운로드 중 오류 발생: {url}, 오류: {str(e)}")
-        return False, None, None
-
-# 여러 오디오 파일을 하나로 합치는 함수 (WAV 형식으로)
-def combine_audio_from_urls(urls, output_filename):
-    try:
-        if not urls:
-            return False, None, None
-            
-        temp_files = []
-        
-        # 각 URL에서 오디오 파일 다운로드 및 임시 저장
-        for i, url in enumerate(urls):
-            temp_filename = f"temp_{i+1}.mp3"
-            success, file_path, _ = download_audio(url, temp_filename, temp)
-            if success:
-                temp_files.append(file_path)
-        
-        if not temp_files:
-            return False, None, None
-            
-        # 오디오 파일 병합
-        combined = AudioSegment.from_file(temp_files[0])
-        for file_path in temp_files[1:]:
-            audio = AudioSegment.from_file(file_path)
-            combined += audio
-            
-        # 결과 파일을 WAV로 저장
-        wav_output_filename = os.path.splitext(output_filename)[0] + ".wav"
-        output_path = os.path.join(download, wav_output_filename)
-        combined.export(output_path, format="wav")
-        
-        # 임시 파일 삭제
-        for file_path in temp_files:
-            try:
-                os.remove(file_path)
-            except:
-                pass
-                
-        print(f"오디오 파일 병합 및 WAV 변환 완료: {wav_output_filename}")
-        return True, output_path, wav_output_filename
-    except Exception as e:
-        print(f"오디오 파일 병합 중 오류 발생: {str(e)}")
-        return False, None, None
-
 dataset_entries = []
 result = []
 log = []
 
+response = requests.get(PAGE_URL, headers=headers)
+soup = BeautifulSoup(response.text, "html.parser")
 tables = soup.find_all("table")
+
 for table_idx, table in enumerate(tables):
     print(f"\n테이블 {table_idx+1} 처리 중...")
     
-    # 테이블에서 tbody 찾기
     tbodies = table.find_all("tbody")
     if not tbodies:
         print(f"테이블 {table_idx+1}에서 tbody를 찾을 수 없습니다. 다음 테이블로 넘어갑니다.")
@@ -129,13 +58,10 @@ for table_idx, table in enumerate(tables):
     for row_idx, row in enumerate(data):
         tds = row.find_all("td")
         if len(tds) < 4:
-            print(f"행 {row_idx+1}에 충분한 열이 없습니다. 다음 행으로 넘어갑니다.")
+            print(f"헤더 감지로 패스")
             continue
         
         name = tds[0].text.strip()
-        print(f"행 {row_idx+1} 처리 중: {name}")
-
-        # 일본어 텍스트 셀 확인 - 비어있는지 체크
         jp_cell = tds[2]
         jp_paragraphs = jp_cell.find_all("p")
         jp_texts = []
@@ -174,24 +100,16 @@ for table_idx, table in enumerate(tables):
                 "reason": "오디오 URL 없음"
             })
             continue
-            
-        # 영어 텍스트 처리 (필요시 사용)
-        en_paragraphs = tds[3].find_all("p")
-        en_texts = []
         
-        for p in en_paragraphs:
-            text = p.get_text(separator=" ", strip=True)
-            if text:
-                en_texts.append(text)
-        
-        # 오디오 다운로드 및 데이터셋 항목 생성
+        print(mp3_urls)
+
+        # len(mp3_url)의 길이가 1인지 True False 여부를 부여
         is_single_audio = len(mp3_urls) == 1
         
         if is_single_audio:
-            # 단일 오디오 다운로드
             audio_url = mp3_urls[0]
             filename = f"{name}.mp3"
-            success, file_path, actual_filename = download_audio(audio_url, filename)
+            success, file_path, actual_filename = download_audio(audio_url, filename, download, headers, temp)
 
             if success:
                 # 단일 오디오: 모든 p 태그 내용을 하나로 합치기
@@ -214,13 +132,11 @@ for table_idx, table in enumerate(tables):
             if len(mp3_urls) != len(jp_texts):
                 print(f"경고: 행 {row_idx+1}에서 오디오 URL ({len(mp3_urls)}개)과 일본어 텍스트 ({len(jp_texts)}개)의 개수가 일치하지 않습니다.")
                 print("오디오 파일을 병합하고 텍스트를 통합합니다.")
-                
-                # 모든 텍스트 통합
+
                 combined_jp_text = "".join(jp_texts)
                 
-                # 모든 오디오 URL에서 파일 다운로드 및 병합
                 combined_filename = f"{name}_combined.mp3"
-                success, output_path, actual_filename = combine_audio_from_urls(mp3_urls, combined_filename)
+                success, output_path, actual_filename = combine_audio_from_urls(mp3_urls, combined_filename, temp)
                 
                 if success:
                     # 데이터셋 항목 추가
@@ -246,7 +162,7 @@ for table_idx, table in enumerate(tables):
                 for i, (audio_url, jp_text) in enumerate(zip(mp3_urls, jp_texts)):
                     # 파일명 형식: {이름}_{인덱스}.mp3
                     filename = f"{name}_{i+1:03d}.mp3"  # 001, 002 형식으로 인덱스 포맷팅
-                    success, file_path, actual_filename = download_audio(audio_url, filename)
+                    success, file_path, actual_filename = download_audio(audio_url, filename, download, headers, temp)
                     
                     if success:
                         downloaded_files.append(actual_filename)
@@ -266,8 +182,7 @@ for table_idx, table in enumerate(tables):
                     "ja": jp_texts,
                     "dataset_entries": multi_entries
                 })
-        
-        # 너무 빠른 요청을 방지하기 위한 딜레이
+
         time.sleep(0.2)
 
 # 데이터셋 파일 저장

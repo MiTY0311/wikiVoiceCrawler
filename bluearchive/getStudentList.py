@@ -2,6 +2,14 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from collections import defaultdict
+import os,sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from util.config import Config
+
+config = Config()
+
+headers = config.headers
 
 URL = "https://bluearchive.wiki/wiki/Characters"
 
@@ -38,4 +46,14 @@ for group in groups:
 result = dict(groups)
 
 groups = list(result.keys())
-pprint(groups[0])
+
+import json
+with open('bluearchive/schools.json', 'w', encoding='utf-8') as f:
+    json.dump(result, f, ensure_ascii=False, indent=2)
+
+# groups를 JSON 파일로 저장
+with open('bluearchive/students.json', 'w', encoding='utf-8') as f:
+    json.dump(groups, f, ensure_ascii=False, indent=2)
+
+# print("JSON 파일들이 저장되었습니다!")
+# pprint(groups[0])

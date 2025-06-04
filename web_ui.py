@@ -1,109 +1,181 @@
 import gradio as gr
+import os
 
-# 임시 함수 (실제 기능 없음, UI 테스트용)
-def download_character_audio(character):
-    """UI 테스트를 위한 더미 함수"""
-    if not character:
-        return "캐릭터 이름을 입력해주세요.", None
-    
-    return f"""
-    [UI 테스트 모드]
-    
-    캐릭터: {character}
-    
-    실제 다운로드는 수행되지 않습니다. 이것은 UI 디자인 확인용 더미 출력입니다.
-    
-    실제 구현 시:
-    - 위키에서 오디오 파일 다운로드
-    - WAV로 변환
-    - 데이터셋 생성
-    - ZIP 파일로 압축
-    
-    이 과정이 실행됩니다.
-    """, None
+def handle_bluearchive_click():
+    """블루아카이브 데이터셋 다운로드 처리"""
+    return "블루아카이브 데이터셋\nBlue Archive 캐릭터 음성 및 대사 데이터\n다운로드를 시작합니다..."
 
-def create_ui():
-    with gr.Blocks(title="블루 아카이브 오디오 다운로더") as app:
-        gr.Markdown("""
-        # 블루 아카이브 오디오 다운로더
-        
-        이 도구는 블루 아카이브 위키에서 캐릭터 음성 파일을 다운로드하고 WAV 형식으로 변환합니다.
-        
-        **사용법:**
-        1. 캐릭터 이름을 영문으로 입력하세요 (예: Mika, Arisu 등).
-        2. '다운로드 시작' 버튼을 클릭하세요.
-        3. 처리가 완료되면 ZIP 파일로 다운로드할 수 있습니다.
+def handle_coming_soon_click():
+    """업데이트 예정 버튼 클릭 처리"""
+    return "업데이트 예정\n새로운 게임 데이터셋 준비 중...\n조금만 기다려주세요!"
 
+# CSS 스타일링
+custom_css = """
+.title-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    color: white;
+    margin-bottom: 30px;
+}
+
+.game-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    background: transparent;
+}
+
+.game-icon {
+    width: 128px !important;
+    height: 128px !important;
+    min-width: 128px !important;
+    max-width: 128px !important;
+    border-radius: 10px !important;
+    font-size: 12px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    transition: transform 0.2s !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    cursor: pointer !important;
+}
+
+.game-icon:hover {
+    transform: scale(1.05) !important;
+}
+
+.coming-soon-icon {
+    background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%) !important;
+    color: white !important;
+    border: 2px solid #9E9E9E !important;
+}
+
+.coming-soon-icon:hover {
+    border-color: #757575 !important;
+}
+
+.bluearchive-btn {
+    background-color: #a7d7ff !important;  /* 연한 하늘색 배경 */
+    color: #003366 !important;  /* 진한 남색 텍스트 */
+    font-weight: bold !important;  /* 텍스트 굵게 */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    line-height: 1.2 !important;
+    font-size: 16px !important;
+}
+
+.game-info {
+    flex: 1;
+}
+
+.status-area {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: transparent;
+    border-radius: 10px;
+    border-left: 4px solid #007bff;
+}
+"""
+
+with gr.Blocks(css=custom_css, title="wikiVoiceCrawler") as demo:
+    # 상단 제목 영역
+    with gr.Row():
+        gr.HTML("""
+        <div class="title-section">
+            <h1 style="margin: 0; font-size: 2.5em;">🎮 wikiVoiceCrawler</h1>
+            <p style="margin: 15px 0 0 0; font-size: 1.2em; opacity: 0.9;">
+                다양한 게임의 캐릭터 음성 데이터셋을 쉽게 다운로드하세요
+            </p>
+        </div>
         """)
-        
-        with gr.Row():
-            character_input = gr.Textbox(label="캐릭터 이름 (영문)", placeholder="예: Mika", value="Mika")
-            start_button = gr.Button("다운로드 시작", variant="primary")
-        
-        with gr.Row():
-            output_text = gr.Textbox(label="처리 결과", lines=10)
-            download_button = gr.File(label="다운로드")
-        
-        # 진행 상황 표시 예시 추가
-        with gr.Row():
-            gr.Markdown("## 진행 상황 미리보기 (실제 작동하지 않음)")
-        
-        with gr.Row():
-            progress_bar = gr.Progress()
-            status_text = gr.Markdown("상태: 대기 중...")
-        
-        # 예시 결과 미리보기 추가
-        with gr.Accordion("결과 미리보기 (예시)", open=False):
-            gr.Markdown("""
-            ```
-            처리 완료!
-            
-            총 24개 항목 다운로드 완료
-            건너뛴 항목: 3개
-            데이터셋 항목 수: 42개
-            
-            파일은 ZIP 아카이브로 압축되었습니다.
-            ```
-            """)
-            
-            gr.HTML("""
-            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                <h4>다운로드된 파일 구조 예시:</h4>
-                <pre>
-Mika_audio_files.zip
-├── Mika_audio/
-│   ├── MemorialLobby_0.wav
-│   ├── MemorialLobby_1_001.wav
-│   ├── MemorialLobby_1_002.wav
-│   └── ...
-├── Mika_dataset.txt
-└── Mika_log.txt
-                </pre>
-            </div>
-            """)
-        
-        start_button.click(
-            fn=download_character_audio,
-            inputs=[character_input],
-            outputs=[output_text, download_button]
-        )
-        
-        gr.Markdown("""
-        ## 시스템 요구 사항
-        - Python 3.6 이상
-        - FFmpeg (오디오 변환에 필요)
-        - 필요한 Python 라이브러리: gradio, requests, beautifulsoup4, pydub
-        
-        ## 참고
-        이 도구는 교육 및 개인 사용 목적으로만 제공됩니다. 다운로드한 오디오 파일의 저작권은 원 저작권자에게 있습니다.
-        """)
     
-    return app
+    # 게임 선택 영역 (3행 2열)
+    with gr.Row():
+        # 왼쪽 컬럼
+        with gr.Column():
+            # 첫 번째 게임 (블루아카이브)
+            with gr.Row(elem_classes=["game-item"]):
+                # 텍스트가 있는 버튼으로 변경
+                bluearchive_btn = gr.Button(
+                    "블루 아카이브", 
+                    elem_classes=["game-icon", "bluearchive-btn"]
+                )
+                status_output1 = gr.Textbox(
+                    value="대기 중... 원하는 게임을 선택해주세요.",
+                    label="",
+                    interactive=False,
+                    elem_classes=["status-area"]
+                )
+            bluearchive_btn.click(
+                fn=handle_bluearchive_click,
+                outputs=status_output1
+            )
+            
+            # 두 번째 게임
+            with gr.Row(elem_classes=["game-item"]):
+                coming_soon_btn1 = gr.Button(
+                    "🔄\n업데이트\n예정", 
+                    elem_classes=["game-icon", "coming-soon-icon"]
+                )
+                status_output2 = gr.Textbox(
+                    value="대기 중... 원하는 게임을 선택해주세요.",
+                    label="",
+                    interactive=False,
+                    elem_classes=["status-area"]
+                )
+            coming_soon_btn1.click(
+                fn=handle_coming_soon_click,
+                outputs=status_output2
+            )
+            
+        # 오른쪽 컬럼
+        with gr.Column():
+            # 네 번째 게임
+            with gr.Row(elem_classes=["game-item"]):
+                coming_soon_btn3 = gr.Button(
+                    "🔄\n업데이트\n예정", 
+                    elem_classes=["game-icon", "coming-soon-icon"]
+                )
+                status_output4 = gr.Textbox(
+                    value="대기 중... 원하는 게임을 선택해주세요.",
+                    label="",
+                    interactive=False,
+                    elem_classes=["status-area"]
+                )
+            coming_soon_btn3.click(
+                fn=handle_coming_soon_click,
+                outputs=status_output4
+            )
+            
+            with gr.Row(elem_classes=["game-item"]):
+                coming_soon_btn4 = gr.Button(
+                    "🔄\n업데이트\n예정", 
+                    elem_classes=["game-icon", "coming-soon-icon"]
+                )
+                status_output5 = gr.Textbox(
+                    value="대기 중... 원하는 게임을 선택해주세요.",
+                    label="",
+                    interactive=False,
+                    elem_classes=["status-area"]
+                )
+            coming_soon_btn4.click(
+                fn=handle_coming_soon_click,
+                outputs=status_output5
+            )
 
-# 메인 실행 함수
-def main():
-    app = create_ui()
-    app.launch(share=True)  # share=True 옵션은 임시 공개 URL 생성
 
 if __name__ == "__main__":
-    main()
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
+        show_error=True,
+    )

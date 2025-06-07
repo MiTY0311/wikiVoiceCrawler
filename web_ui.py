@@ -1,6 +1,11 @@
 import gradio as gr
 import os
 
+from util.config import Config
+
+config = Config()
+main_port = config.main_port
+
 def handle_bluearchive_click():
     """블루아카이브 데이터셋 다운로드 처리"""
     return "블루아카이브 데이터셋\nBlue Archive 캐릭터 음성 및 대사 데이터\n다운로드를 시작합니다..."
@@ -175,7 +180,7 @@ with gr.Blocks(css=custom_css, title="wikiVoiceCrawler") as demo:
 if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
-        server_port=7860,
+        server_port=main_port,
         share=False,
         show_error=True,
     )

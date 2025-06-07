@@ -2,18 +2,62 @@ import gradio as gr
 import json
 import os
 import sys
+import subprocess
+import time
+
+# 설정 파일 불러오기
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from util.config import Config
+config = Config()
 
 # 상수 정의
 CONFIG_PATH = "bluearchive/students.json"
+SCHOOLS_PATH = "bluearchive/schools.json"
 DEFAULT_MESSAGE = "학원을 선택해주세요."
+
+# 데이터 업데이트 함수
+def update_student_data():
+    print("학생 데이터 업데이트 중...")
+    try:
+        start_time = time.time()
+        # getStudentList.py 실행
+        result = subprocess.run(
+            [sys.executable, "bluearchive/getStudentList.py"], 
+            capture_output=True, 
+            text=True,
+            check=True
+        )
+        end_time = time.time()
+        print(f"데이터 업데이트 완료! (소요 시간: {end_time - start_time:.2f}초)")
+        print(result.stdout)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"데이터 업데이트 실패 (반환 코드: {e.returncode})")
+        print(f"오류 출력: {e.stderr}")
+        return False
+    except Exception as e:
+        print(f"데이터 업데이트 중 오류 발생: {str(e)}")
+        return False
 
 # 데이터 로드 함수
 def load_student_data():
     try:
+        # 시작할 때 데이터 업데이트
+        update_success = update_student_data()
+        if not update_success:
+            print("경고: 데이터 업데이트 실패. 기존 파일을 사용합니다.")
+        
+        # 학생 데이터 파일 로드
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         print("학생 데이터 로드 완료")
         return data
+    except FileNotFoundError:
+        print(f"오류: {CONFIG_PATH} 파일을 찾을 수 없습니다.")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print(f"오류: {CONFIG_PATH} 파일의 JSON 형식이 올바르지 않습니다.")
+        sys.exit(1)
     except Exception as e:
         print(f"학생 데이터 로드 실패: {e}")
         sys.exit(1)
@@ -160,4 +204,5 @@ def create_interface():
 # 메인 실행 부분
 if __name__ == "__main__":
     demo = create_interface()
-    demo.launch(ssl_verify=False)
+    print(f"블루 아카이브 웹 UI를 포트 {config.bluearchive_port}에서 시작합니다...")
+    demo.launch(ssl_verify=False, server_port=config.bluearchive_port)

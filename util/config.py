@@ -6,7 +6,15 @@ headers = {
 # 다운로드 기본경로
 outputPath= "output"
 
+main_port = 7680
+bluearchive_port = 7681
+honkaistarrail_port = 7682
+
 class Config:
     def __init__(self):
         self.headers = headers
         self.outputPath = outputPath
+
+        self.main_port = main_port
+        self.bluearchive_port = bluearchive_port
+        self.honkaistarrail_port = honkaistarrail_port

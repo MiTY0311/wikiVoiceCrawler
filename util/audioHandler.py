@@ -1,74 +1,90 @@
 from pydub import AudioSegment
 import requests
 import os
+import shutil
 
-# 오디오 파일 다운로드 함수 (MP3 다운로드 후 WAV로 변환)
-def download_audio(url, filename, dir, headers, temp):
+def mp3ToWav(mp3_path, wav_path):
+    audio = AudioSegment.from_mp3(mp3_path)
+    audio.export(wav_path, format="wav")
+    os.remove(mp3_path)
+
+
+def audios_to_dataset(headers, urls, filename, tempPath, downloadPath):
+    temp_files = []
+    temp_wav_files = []
+    
     try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-
-            path = os.path.join(temp, filename)
-            with open(path, 'wb') as f:
-                f.write(response.content)
-            
-            #mp3 -> wav 
-            filename = os.path.splitext(filename)[0] + ".wav"
-            filepath = os.path.join(dir, filename)
-            
-            audio = AudioSegment.from_mp3(path)
-            audio.export(filepath, format="wav")
-            
-            # 임시 MP3 파일 삭제
-            os.remove(path)
-            
-            print(f"다운로드 및 WAV 변환 완료: {filename}")
-            return True, filepath, filename
-        else:
-            print(f"다운로드 실패 (상태 코드: {response.status_code}): {url}")
-            return False, None, None
-    except Exception as e:
-        print(f"다운로드 중 오류 발생: {url}, 오류: {str(e)}")
-        return False, None, None
-
-# 여러 오디오 파일을 하나로 합치는 함수 (WAV 형식으로)
-def combine_audio_from_urls(urls, filename, dir, headers, temp):
-    try:
-        if not urls:
-            return False, None, None
-            
-        temp_files = []
-        
-        # 각 URL에서 오디오 파일 다운로드 및 임시 저장
+        # MP3 파일 다운로드
         for i, url in enumerate(urls):
-            temp_filename = f"temp_{i+1}.mp3"
-            success, file_path, _ = download_audio(url, temp_filename, dir, headers, temp)
-            if success:
-                temp_files.append(file_path)
+            mp3_filename = f"{filename}_{i+1:03d}.mp3"
+            mp3_path = os.path.join(tempPath, mp3_filename)
+            
+            try:
+                response = requests.get(url, headers=headers)
+                
+                if response.status_code == 200:
+                    with open(mp3_path, 'wb') as f:
+                        f.write(response.content)
+                    
+                    temp_files.append(mp3_path)
+                else:
+                    print(f"다운로드 실패 (상태 코드: {response.status_code}): {url}")
+                    return False, None, None
+            except Exception as e:
+                print(f"다운로드 중 오류: {str(e)}")
         
         if not temp_files:
+            print(f"변환된 WAV 파일이 없습니다.")
             return False, None, None
-            
-        # 오디오 파일 병합
-        combined = AudioSegment.from_file(temp_files[0])
-        for file_path in temp_files[1:]:
-            audio = AudioSegment.from_file(file_path)
-            combined += audio
-            
-        # 결과 파일을 WAV로 저장
-        filename = os.path.splitext(filename)[0] + ".wav"
-        filepath = os.path.join(dir, filename)
-        combined.export(filepath, format="wav")
         
-        # 임시 파일 삭제
-        for file_path in temp_files:
+        # MP3 파일을 WAV로 변환
+        for mp3_path in temp_files:
             try:
-                os.remove(file_path)
-            except:
-                pass
+                wav_filename = os.path.splitext(os.path.basename(mp3_path))[0] + ".wav"
+                wav_path = os.path.join(tempPath, wav_filename)
                 
-        print(f"오디오 파일 병합 및 WAV 변환 완료: {filename}")
-        return True, filepath, filename
+                mp3ToWav(mp3_path, wav_path)
+                
+                temp_wav_files.append(wav_path)
+            except Exception as e:
+                print(f"변환 실패: {os.path.basename(mp3_path)}, 오류: {str(e)}")
+        
+        if not temp_wav_files:
+            print(f"변환된 WAV 파일이 없습니다.")
+            return False, None, None
+        
+        # WAV 파일 병합
+        try:
+            if len(temp_wav_files) == 1:
+                combined = AudioSegment.from_file(temp_wav_files[0])
+            else:
+                combined = AudioSegment.from_file(temp_wav_files[0])
+                
+                for wav_path in temp_wav_files[1:]:
+                    audio = AudioSegment.from_file(wav_path)
+                    combined += audio
+        except Exception as e:
+            print(f"오디오 병합 중 오류: {str(e)}")
+            return False, None, None
+        
+        # 최종 WAV 파일 저장
+        try:
+            output_filename = f"{filename}.wav"
+            output_path = os.path.join(downloadPath, output_filename)
+            combined.export(output_path, format="wav")
+        except Exception as e:
+            print(f"파일 저장 중 오류: {str(e)}")
+            return False, None, None
+        
+        # 임시 파일 정리
+        for wav_path in temp_wav_files:
+            try:
+                os.remove(wav_path)
+            except Exception as e:
+                print(f"임시 파일 삭제 실패: {os.path.basename(wav_path)}")
+        
+        return True, output_path, output_filename
+
     except Exception as e:
-        print(f"오디오 파일 병합 중 오류 발생: {str(e)}")
+        print(f"오디오 처리 중 오류: {str(e)}")
         return False, None, None

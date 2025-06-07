@@ -1,9 +1,16 @@
 import os
+import shutil
 
 def setup(path, name):
+
     char_path = os.path.join(path, name)
-    
-    # 캐릭터 이름으로 된 디렉토리
+    if os.path.exists(char_path):
+        print(f"기존 디렉토리 '{char_path}' 삭제 중...")
+        try:
+            shutil.rmtree(char_path)
+            print(f"'{char_path}' 삭제 완료")
+        except Exception as e:
+            print(f"디렉토리 삭제 중 오류 발생: {str(e)}")
     os.makedirs(char_path, exist_ok=True)
     
     # 오디오
@@ -16,15 +23,12 @@ def setup(path, name):
     
     # txt
     txt_path = os.path.join(char_path, f"{name}.txt")
-    
-    # 빈 데이터셋 파일 생성
     with open(txt_path, 'w', encoding='utf-8') as f:
         pass
+
+    # log
+    log_path = os.path.join(char_path, "log.txt")
+    with open(log_path, 'w', encoding='utf-8') as f:
+        pass
     
-    return download_dir, temp_dir, txt_path
-    # return {
-    #     'character_path': char_path,
-    #     'download_dir': download_dir,
-    #     'temp_dir': temp_dir,
-    #     'dataset_file': dataset_file
-    # }
+    return download_dir, temp_dir, txt_path, log_path

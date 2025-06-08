@@ -1,208 +1,164 @@
 import gradio as gr
-import json
 import os
 import sys
-import subprocess
-import time
 
-# 설정 파일 불러오기
+# 상위 디렉토리 모듈 import
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.config import Config
+from getStudentList import get_student_list
+from voiceCrawler import voice_crawler
+
 config = Config()
 
-# 상수 정의
-CONFIG_PATH = "bluearchive/students.json"
-SCHOOLS_PATH = "bluearchive/schools.json"
-DEFAULT_MESSAGE = "학원을 선택해주세요."
-
-# 데이터 업데이트 함수
-def update_student_data():
-    print("학생 데이터 업데이트 중...")
-    try:
-        start_time = time.time()
-        # getStudentList.py 실행
-        result = subprocess.run(
-            [sys.executable, "bluearchive/getStudentList.py"], 
-            capture_output=True, 
-            text=True,
-            check=True
-        )
-        end_time = time.time()
-        print(f"데이터 업데이트 완료! (소요 시간: {end_time - start_time:.2f}초)")
-        print(result.stdout)
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"데이터 업데이트 실패 (반환 코드: {e.returncode})")
-        print(f"오류 출력: {e.stderr}")
-        return False
-    except Exception as e:
-        print(f"데이터 업데이트 중 오류 발생: {str(e)}")
-        return False
-
-# 데이터 로드 함수
-def load_student_data():
-    try:
-        # 시작할 때 데이터 업데이트
-        update_success = update_student_data()
-        if not update_success:
-            print("경고: 데이터 업데이트 실패. 기존 파일을 사용합니다.")
-        
-        # 학생 데이터 파일 로드
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        print("학생 데이터 로드 완료")
-        return data
-    except FileNotFoundError:
-        print(f"오류: {CONFIG_PATH} 파일을 찾을 수 없습니다.")
-        sys.exit(1)
-    except json.JSONDecodeError:
-        print(f"오류: {CONFIG_PATH} 파일의 JSON 형식이 올바르지 않습니다.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"학생 데이터 로드 실패: {e}")
-        sys.exit(1)
-
-# 데이터셋 다운로드 함수
 def download_dataset(school, student, version):
-    """데이터셋 다운로드 처리 함수"""
-    # 실제 다운로드 로직 구현 위치
-    message = f"{school} 학원의 {student} 학생의 {version} 버전 데이터셋 다운로드 시작..."
-    progress = gr.update(value=0.5, visible=True)
+    """데이터셋 다운로드 처리"""
+    # 입력 검증
+    if not all([school, student, version]) or school == "-" or student == "전체":
+        return "❌ 학원, 학생, 버전을 모두 선택해주세요."
     
-    # TODO: 여기에 실제 다운로드 로직 추가
+    try:
+        # 캐릭터 이름 정리 (괄호 부분 제거하여 기본 이름 사용)
+        character_name = version.split(' (')[0] if '(' in version else version
+        
+        # 크롤링 시작 메시지
+        start_msg = f"🚀 {school}의 {student} ({version}) 크롤링 시작...\n"
+        
+        # voice_crawler 함수 실행
+        success, success_count, failed_count, logs = voice_crawler(character_name)
+        
+        if success:
+            result_msg = (
+                f"✅ 크롤링 완료!\n"
+                f"📊 성공: {success_count}개\n"
+                f"⚠️ 실패: {failed_count}개\n"
+                f"💾 캐릭터: {character_name}\n"
+                f"🏛️ 학원: {school}\n"
+                f"🎭 버전: {version}"
+            )
+            
+            if failed_count > 0:
+                result_msg += f"\n\n📝 실패 사유는 로그 파일을 확인하세요."
+                
+        else:
+            result_msg = (
+                f"❌ 크롤링 실패!\n"
+                f"🎯 캐릭터: {character_name}\n"
+                f"🏛️ 학원: {school}\n"
+                f"🎭 버전: {version}\n"
+                f"💡 네트워크 연결이나 사이트 접근을 확인해주세요."
+            )
+            
+        return start_msg + result_msg
+        
+    except Exception as e:
+        error_msg = (
+            f"❌ 예상치 못한 오류 발생!\n"
+            f"🎯 캐릭터: {character_name if 'character_name' in locals() else 'Unknown'}\n"
+            f"🏛️ 학원: {school}\n"
+            f"🎭 버전: {version}\n"
+            f"🔧 오류 내용: {str(e)}"
+        )
+        return error_msg
+
+def load_student_data():
+    """학생 데이터 로드"""
+    success, schools_list, students_data, total_students, error = get_student_list()
     
-    return message, progress
+    if success:
+        return (
+            True,
+            students_data,
+            f"✅ 로드 완료! {len(schools_list)}개 학교, {total_students}명 학생",
+            gr.update(choices=["-"] + sorted(schools_list), visible=True),
+            gr.update(visible=True)  # selection_panel 표시
+        )
+    else:
+        error_msg = f"❌ 로드 실패: {str(error)}" if error else "❌ 로드 실패: 알 수 없는 오류"
+        return (
+            False,
+            None,
+            error_msg,
+            gr.update(visible=False),
+            gr.update(visible=False)  # selection_panel 숨김
+        )
+
+def update_students(school, students_data):
+    """학원 선택 시 학생 목록 업데이트"""
+    if not students_data or school == "-":
+        return gr.update(choices=["전체"], visible=False), gr.update(visible=False)
+    
+    students = list(students_data.get(school, {}).keys())
+    return (
+        gr.update(choices=["전체"] + sorted(students), value="전체", visible=True),
+        gr.update(visible=False)
+    )
+
+def update_versions(school, student, students_data):
+    """학생 선택 시 버전 목록 업데이트"""
+    if not students_data or student == "전체":
+        return gr.update(choices=[], visible=False), gr.update(visible=False)
+    
+    versions = students_data.get(school, {}).get(student, [])
+    return (
+        gr.update(choices=versions, value=versions[0] if versions else None, visible=True),
+        gr.update(visible=bool(versions))
+    )
 
 def create_interface():
-    """Gradio 인터페이스 생성 함수"""
-    # 학생 데이터 로드
-    students_data = load_student_data()
-    schools_list = list(students_data.keys())
-    
-    # Gradio 블록 정의
-    with gr.Blocks(
-        title="Blue Archive Character Browser",
-        theme=gr.themes.Soft(primary_hue="blue", secondary_hue="cyan", neutral_hue="slate")
-    ) as demo:
-        gr.Markdown("# 블루 아카이브 캐릭터 브라우저")
+    """Gradio 인터페이스 생성"""
+    with gr.Blocks(title="Blue Archive Voice Crawler") as demo:
+        gr.Markdown("# 🎮 블루 아카이브 음성 크롤러")
         
-        with gr.Column():
-            # UI 요소 정의
-            school_filter = gr.Dropdown(
-                choices=["-"] + sorted(schools_list),
-                value="-",
-                label="학원",
-                interactive=True
-            )
-            
-            student_filter = gr.Dropdown(
-                choices=["전체"],
-                value="전체",
-                label="학생 목록",
-                visible=False,
-                interactive=True
-            )
-            
-            version_filter = gr.Dropdown(
-                choices=[],
-                label="학생 버전",
-                visible=False,
-                interactive=True
-            )
-            
-            download_button = gr.Button(
-                "데이터셋 다운로드",
-                visible=False
-            )
-            
-            progress_bar = gr.Slider(
-                minimum=0,
-                maximum=1,
-                value=0,
-                label="다운로드 진행 상태",
-                interactive=False,
-                visible=False
-            )
-            
-            output_message = gr.Textbox(
-                label="상태 메시지",
-                interactive=False,
-                value=DEFAULT_MESSAGE
-            )
+        # 데이터 상태
+        loaded = gr.State(False)
+        students_data = gr.State(None)
         
-        # 이벤트 핸들러 정의
-        def get_students_by_school(school):
-            """학원 선택 시 해당 학원의 학생 목록 가져오기"""
-            if school == "-":
-                return [
-                    gr.update(choices=["전체"], value="전체", visible=False),
-                    gr.update(visible=False),
-                    gr.update(visible=False),
-                    f"학원 선택: {school} - 학생 목록 드롭다운 숨김"
-                ]
-            
-            students_in_school = list(students_data.get(school, {}).keys())
-            
-            return [
-                gr.update(choices=["전체"] + sorted(students_in_school), value="전체", visible=True),
-                gr.update(visible=False),
-                gr.update(visible=False),
-                f"학원 선택: {school} - 학생 목록: {', '.join(students_in_school)}"
-            ]
+        # 데이터 로드 섹션
+        with gr.Row():
+            load_btn = gr.Button("📚 학생 데이터 불러오기", variant="primary")
+            status = gr.Textbox(label="상태", value="데이터를 불러오세요", interactive=False)
         
-        def get_versions_by_student(school, student):
-            """학생 선택 시 해당 학생의 버전 목록 가져오기"""
-            if student == "전체" or school == "-":
-                return [
-                    gr.update(choices=[], visible=False),
-                    gr.update(visible=False),
-                    f"학교: {school}, 학생: {student} - 버전 드롭다운 숨김"
-                ]
-            
-            versions = students_data.get(school, {}).get(student, [])
-            debug_msg = f"학교: {school}, 학생: {student}, 버전 목록: {versions}"
-            
-            return [
-                gr.update(choices=versions, value=versions[0] if versions else None, visible=True),
-                gr.update(visible=False),
-                debug_msg
-            ]
-        
-        def show_download_button(version):
-            """버전 선택 시 다운로드 버튼 표시"""
-            if version:
-                return gr.update(visible=True), f"버전 선택: {version} - 다운로드 버튼 표시됨"
-            return gr.update(visible=False), "버전이 선택되지 않음 - 다운로드 버튼 숨김"
+        # 선택 섹션
+        with gr.Column(visible=False) as selection_panel:
+            school = gr.Dropdown(label="🏛️ 학원", choices=["-"], value="-")
+            student = gr.Dropdown(label="👤 학생", choices=["전체"], visible=False)
+            version = gr.Dropdown(label="🎭 버전", choices=[], visible=False)
+            download_btn = gr.Button("⬇️ 다운로드", variant="secondary", visible=False)
+            result = gr.Textbox(label="결과", interactive=False)
         
         # 이벤트 연결
-        school_filter.change(
-            get_students_by_school,
-            inputs=[school_filter],
-            outputs=[student_filter, download_button, progress_bar, output_message]
+        load_btn.click(
+            fn=load_student_data,
+            outputs=[loaded, students_data, status, school, selection_panel]
         )
         
-        student_filter.change(
-            get_versions_by_student,
-            inputs=[school_filter, student_filter],
-            outputs=[version_filter, download_button, output_message]
+        school.change(
+            fn=update_students,
+            inputs=[school, students_data],
+            outputs=[student, download_btn]
         )
         
-        version_filter.change(
-            show_download_button,
-            inputs=[version_filter],
-            outputs=[download_button, output_message]
+        student.change(
+            fn=update_versions,
+            inputs=[school, student, students_data],
+            outputs=[version, download_btn]
         )
         
-        download_button.click(
-            download_dataset,
-            inputs=[school_filter, student_filter, version_filter],
-            outputs=[output_message, progress_bar]
+        version.change(
+            fn=lambda v: gr.update(visible=bool(v)),
+            inputs=[version],
+            outputs=[download_btn]
+        )
+        
+        download_btn.click(
+            fn=download_dataset,
+            inputs=[school, student, version],
+            outputs=[result]
         )
     
     return demo
 
-# 메인 실행 부분
 if __name__ == "__main__":
     demo = create_interface()
-    print(f"블루 아카이브 웹 UI를 포트 {config.bluearchive_port}에서 시작합니다...")
-    demo.launch(ssl_verify=False, server_port=config.bluearchive_port)
+    print(f"🚀 웹 UI 시작: http://localhost:{config.bluearchive_port}")
+    demo.launch(server_port=config.bluearchive_port)

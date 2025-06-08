@@ -1,186 +1,156 @@
 import gradio as gr
+import subprocess
+import sys
 import os
-
+import time
+import psutil
+import signal
 from util.config import Config
 
 config = Config()
-main_port = config.main_port
 
-def handle_bluearchive_click():
-    """블루아카이브 데이터셋 다운로드 처리"""
-    return "블루아카이브 데이터셋\nBlue Archive 캐릭터 음성 및 대사 데이터\n다운로드를 시작합니다..."
-
-def handle_coming_soon_click():
-    """업데이트 예정 버튼 클릭 처리"""
-    return "업데이트 예정\n새로운 게임 데이터셋 준비 중...\n조금만 기다려주세요!"
-
-# CSS 스타일링
-custom_css = """
-.title-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 30px;
-    border-radius: 15px;
-    text-align: center;
-    color: white;
-    margin-bottom: 30px;
+# 게임별 프로세스 추적
+game_processes = {
+    "bluearchive": None
 }
 
-.game-item {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
-    padding: 15px;
-    border: 2px solid #e0e0e0;
-    border-radius: 10px;
-    background: transparent;
-}
+def find_process_by_port(port):
+    """포트를 사용하는 프로세스 찾기"""
+    try:
+        for proc in psutil.process_iter(['pid', 'connections']):
+            try:
+                for conn in proc.connections():
+                    if conn.laddr.port == port:
+                        return proc.pid
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except:
+        pass
+    return None
 
-.game-icon {
-    width: 128px !important;
-    height: 128px !important;
-    min-width: 128px !important;
-    max-width: 128px !important;
-    border-radius: 10px !important;
-    font-size: 12px !important;
-    flex-shrink: 0 !important;
-    flex-grow: 0 !important;
-    transition: transform 0.2s !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    cursor: pointer !important;
-}
+def is_game_running(game_name):
+    """게임이 실행 중인지 확인"""
+    if game_name == "bluearchive":
+        port = config.bluearchive_port
+        # 프로세스 확인
+        if game_processes[game_name] and game_processes[game_name].poll() is None:
+            return True
+        # 포트 확인
+        return find_process_by_port(port) is not None
+    return False
 
-.game-icon:hover {
-    transform: scale(1.05) !important;
-}
+def kill_game_process(game_name):
+    """게임 프로세스 종료"""
+    if game_name == "bluearchive":
+        port = config.bluearchive_port
+    else:
+        return False
+    
+    try:
+        # 1. 저장된 프로세스 종료
+        if game_processes[game_name]:
+            game_processes[game_name].terminate()
+            time.sleep(1)
+            if game_processes[game_name].poll() is None:
+                game_processes[game_name].kill()
+            game_processes[game_name] = None
+        
+        # 2. 포트 사용 프로세스 종료
+        pid = find_process_by_port(port)
+        if pid:
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+            if psutil.pid_exists(pid):
+                os.kill(pid, signal.SIGKILL)
+        
+        return True
+    except Exception as e:
+        print(f"프로세스 종료 오류: {e}")
+        return False
 
-.coming-soon-icon {
-    background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%) !important;
-    color: white !important;
-    border: 2px solid #9E9E9E !important;
-}
+def toggle_bluearchive():
+    """블루아카이브 토글 (실행/종료)"""
+    if is_game_running("bluearchive"):
+        # 실행 중이면 종료
+        if kill_game_process("bluearchive"):
+            return "❌ 블루아카이브 종료됨"
+        else:
+            return "⚠️ 종료 중 오류 발생"
+    else:
+        # 실행 중이 아니면 시작
+        try:
+            root_dir = os.path.dirname(os.path.abspath(__file__))
+            game_processes["bluearchive"] = subprocess.Popen([
+                sys.executable, 
+                os.path.join(root_dir, "bluearchive", "web_ui.py")
+            ])
+            
+            time.sleep(2)  # 실행 대기
+            
+            if is_game_running("bluearchive"):
+                return f"✅ 블루아카이브 시작됨!\n🌐 http://localhost:{config.bluearchive_port}"
+            else:
+                return "❌ 시작 실패"
+                
+        except Exception as e:
+            return f"❌ 실행 실패: {str(e)}"
 
-.coming-soon-icon:hover {
-    border-color: #757575 !important;
-}
+def launch_coming_soon():
+    """업데이트 예정"""
+    return "🔄 업데이트 예정\n새로운 게임 준비 중..."
 
-.bluearchive-btn {
-    background-color: #a7d7ff !important;  /* 연한 하늘색 배경 */
-    color: #003366 !important;  /* 진한 남색 텍스트 */
-    font-weight: bold !important;  /* 텍스트 굵게 */
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    text-align: center !important;
-    line-height: 1.2 !important;
-    font-size: 16px !important;
+# 간단한 CSS
+css = """
+.title { 
+    text-align: center; 
+    padding: 20px; 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+    border-radius: 10px; 
+    color: white; 
 }
-
-.game-info {
-    flex: 1;
-}
-
-.status-area {
-    margin-top: 30px;
-    padding: 20px;
-    background-color: transparent;
-    border-radius: 10px;
-    border-left: 4px solid #007bff;
+.game-btn { 
+    height: 80px !important; 
+    font-size: 18px !important; 
+    margin: 10px !important; 
 }
 """
 
-with gr.Blocks(css=custom_css, title="wikiVoiceCrawler") as demo:
-    # 상단 제목 영역
-    with gr.Row():
-        gr.HTML("""
-        <div class="title-section">
-            <h1 style="margin: 0; font-size: 2.5em;">🎮 wikiVoiceCrawler</h1>
-            <p style="margin: 15px 0 0 0; font-size: 1.2em; opacity: 0.9;">
-                다양한 게임의 캐릭터 음성 데이터셋을 쉽게 다운로드하세요
-            </p>
-        </div>
-        """)
+with gr.Blocks(css=css, title="wikiVoiceCrawler") as demo:
     
-    # 게임 선택 영역 (3행 2열)
+    # 제목
+    gr.HTML('<div class="title"><h1>🎮 wikiVoiceCrawler</h1><p>게임 캐릭터 음성 데이터셋 다운로더</p></div>')
+    
+    # 게임 선택 (각각 개별 상태)
     with gr.Row():
-        # 왼쪽 컬럼
         with gr.Column():
-            # 첫 번째 게임 (블루아카이브)
-            with gr.Row(elem_classes=["game-item"]):
-                # 텍스트가 있는 버튼으로 변경
-                bluearchive_btn = gr.Button(
-                    "블루 아카이브", 
-                    elem_classes=["game-icon", "bluearchive-btn"]
-                )
-                status_output1 = gr.Textbox(
-                    value="대기 중... 원하는 게임을 선택해주세요.",
-                    label="",
-                    interactive=False,
-                    elem_classes=["status-area"]
-                )
-            bluearchive_btn.click(
-                fn=handle_bluearchive_click,
-                outputs=status_output1
+            bluearchive_btn = gr.Button("🎓 블루 아카이브", variant="primary", elem_classes=["game-btn"])
+            bluearchive_status = gr.Textbox(
+                label="블루 아카이브 상태", 
+                value="대기 중...", 
+                interactive=False,
+                lines=2
             )
-            
-            # 두 번째 게임
-            with gr.Row(elem_classes=["game-item"]):
-                coming_soon_btn1 = gr.Button(
-                    "🔄\n업데이트\n예정", 
-                    elem_classes=["game-icon", "coming-soon-icon"]
-                )
-                status_output2 = gr.Textbox(
-                    value="대기 중... 원하는 게임을 선택해주세요.",
-                    label="",
-                    interactive=False,
-                    elem_classes=["status-area"]
-                )
-            coming_soon_btn1.click(
-                fn=handle_coming_soon_click,
-                outputs=status_output2
-            )
-            
-        # 오른쪽 컬럼
+        
         with gr.Column():
-            # 네 번째 게임
-            with gr.Row(elem_classes=["game-item"]):
-                coming_soon_btn3 = gr.Button(
-                    "🔄\n업데이트\n예정", 
-                    elem_classes=["game-icon", "coming-soon-icon"]
-                )
-                status_output4 = gr.Textbox(
-                    value="대기 중... 원하는 게임을 선택해주세요.",
-                    label="",
-                    interactive=False,
-                    elem_classes=["status-area"]
-                )
-            coming_soon_btn3.click(
-                fn=handle_coming_soon_click,
-                outputs=status_output4
+            coming_soon_btn = gr.Button("🔄 업데이트 예정", elem_classes=["game-btn"])
+            coming_soon_status = gr.Textbox(
+                label="업데이트 예정 상태", 
+                value="대기 중...", 
+                interactive=False,
+                lines=2
             )
-            
-            with gr.Row(elem_classes=["game-item"]):
-                coming_soon_btn4 = gr.Button(
-                    "🔄\n업데이트\n예정", 
-                    elem_classes=["game-icon", "coming-soon-icon"]
-                )
-                status_output5 = gr.Textbox(
-                    value="대기 중... 원하는 게임을 선택해주세요.",
-                    label="",
-                    interactive=False,
-                    elem_classes=["status-area"]
-                )
-            coming_soon_btn4.click(
-                fn=handle_coming_soon_click,
-                outputs=status_output5
-            )
+    
+    # 이벤트 연결 (토글 기능)
+    bluearchive_btn.click(fn=toggle_bluearchive, outputs=bluearchive_status)
+    coming_soon_btn.click(fn=launch_coming_soon, outputs=coming_soon_status)
 
+# 프로그램 종료 시 정리
+def cleanup():
+    for game_name in game_processes:
+        kill_game_process(game_name)
+
+import atexit
+atexit.register(cleanup)
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=main_port,
-        share=False,
-        show_error=True,
-    )
+    demo.launch(server_port=config.main_port)

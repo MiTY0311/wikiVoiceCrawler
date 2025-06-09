@@ -1,19 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from collections import deque
+# from urllib.parse import urljoin
 import os, sys
-import time
-from pprint import pprint
-from pydub import AudioSegment
-import io
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.config import Config
-# from util.audioHandler import download_audio, combine_download_audio
 from util.audioHandler import audios_to_dataset
 from util.pathManager import setup
-
-# character = "Mika"  #첫단어 대문자로해야함 (wiki주소 이슈)
 
 def voice_crawler(character):
     
@@ -28,7 +22,7 @@ def voice_crawler(character):
     downloadPath, tempPath, txtPath, logPath = setup(path, character)
     
     # 데이터 저장용 리스트 초기화
-    txtList = []
+    txtList = deque()
     log = []
     
     try:
@@ -73,7 +67,8 @@ def voice_crawler(character):
                 parsingTexts = tds[2]              # jp텍스트
                 
                 # 텍스트 파싱
-                texts = []
+                # texts = []
+                texts = deque()
                 for t in parsingTexts.find_all("p"):
                     text_content = t.get_text(separator="", strip=True)
                     if text_content:
@@ -113,30 +108,34 @@ def voice_crawler(character):
                 print(f"처리 중: {tag}")
                 
                 # 오디오 다운로드 및 데이터셋 생성
-                success, output_path, filename = audios_to_dataset(
+                success, output_path, audioText = audios_to_dataset(
                     headers,
                     urls,
                     tag,
                     tempPath,
                     downloadPath,
+
+                    character,
+                    texts,
                 )
                 
                 if success:
-                    audioText = "".join(texts)
-                    audioText = f"{character}\\{filename}|{audioText}"
                     txtList.append(audioText)
                     success_count += 1
 
-                    # 데이터셋 파일 업데이트
-                    with open(txtPath, 'w', encoding='utf-8') as f:
-                        for entry in txtList:
-                            f.write(entry + '\n')
+
+
+        # 데이터셋 파일 업데이트
+        with open(txtPath, 'w', encoding='utf-8') as f:
+            for entry in txtList:
+                f.write(entry + '\n')
 
         # 로그 파일 저장
         if log:
             with open(logPath, 'w', encoding='utf-8') as f:
                 for item in log:
                     f.write(f"테이블 {item['table']}, 행 {item['row']}, 태그: {item['tag']}, 이유: {item['reason']}\n")
+    
 
         print(f"\n=== 크롤링 완료 ===")
         print(f"성공한 항목: {success_count}개")

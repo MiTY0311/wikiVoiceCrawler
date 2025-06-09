@@ -17,9 +17,11 @@ def download_dataset(school, student, version):
         return "❌ 학원, 학생, 버전을 모두 선택해주세요."
     
     try:
-        # 캐릭터 이름 정리 (괄호 부분 제거하여 기본 이름 사용)
-        character_name = version.split(' (')[0] if '(' in version else version
-        
+        print(version)
+
+        # character_name = version.split(' (')[0] if '(' in version else version
+        character_name = version.replace(' ', '_')
+        print(character_name)
         # 크롤링 시작 메시지
         start_msg = f"🚀 {school}의 {student} ({version}) 크롤링 시작...\n"
         

@@ -57,12 +57,6 @@ def get_student_list():
         print(f"Error in get_student_list: {e}")
         return False, None, None, None, e
 
-
-a,b,c ,d,e = get_student_list()
-print(a,b)
-
-
-
 if __name__ == "__main__":
     result = get_student_list()
     

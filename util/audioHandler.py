@@ -27,10 +27,8 @@ def audios_to_dataset(headers,
                 print(f"다운로드 실패: {url}")
                 continue
             
-            # 메모리에서 직접 WAV 변환 (임시 파일 없이)
-            mp3_audio = AudioSegment.from_file_using_temporary_files(
-                response.content, format="mp3"
-            )
+            mp3_data = BytesIO(response.content)
+            mp3_audio = AudioSegment.from_file(mp3_data, format="mp3")
             
             # 임시 WAV 파일 저장
             wav_path = Path(tempPath) / f"{filename}_{i+1:03d}.wav"
@@ -42,7 +40,9 @@ def audios_to_dataset(headers,
         
         # WAV 파일 병합
         combined = AudioSegment.from_file(wav_files[0])
+        silence = AudioSegment.silent(duration=500)
         for wav_file in wav_files[1:]:
+            combined += silence
             combined += AudioSegment.from_file(wav_file)
         
         # 최종 파일 저장
@@ -52,7 +52,7 @@ def audios_to_dataset(headers,
 
         if output_path.exists():
             audioText = "".join(texts)
-            audioText = f"{character}\\{output_filename}|{audioText}"
+            audioText = f"{character}\\{output_filename}|{audioText}"\
         
         # 임시 파일 정리
         for wav_file in wav_files:

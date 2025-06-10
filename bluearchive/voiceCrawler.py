@@ -123,14 +123,13 @@ def voice_crawler(character):
                     txtList.append(audioText)
                     success_count += 1
 
+                    print(f"처리 완료 {tag}")
+                    print("text : ",audioText)
 
-
-        # 데이터셋 파일 업데이트
         with open(txtPath, 'w', encoding='utf-8') as f:
             for entry in txtList:
                 f.write(entry + '\n')
 
-        # 로그 파일 저장
         if log:
             with open(logPath, 'w', encoding='utf-8') as f:
                 for item in log:

@@ -26,7 +26,6 @@ def voice_crawler(character):
     log = []
     
     try:
-        # 웹페이지 요청 및 파싱
         response = requests.get(PAGE_URL, headers=headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")

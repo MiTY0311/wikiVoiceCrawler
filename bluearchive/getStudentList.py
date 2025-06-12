@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from collections import defaultdict
+import traceback
 import os, sys
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -9,56 +10,96 @@ import os, sys
 # URL = "https://bluearchive.wiki/wiki/Characters"
 # soup = parserSetup(URL)
 
-def get_student_list():
+# def get_student_list():
+#     try:
+#         # 설정 및 헤더 로드
+#         sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+#         from util.config import Config
+#         config = Config()
+#         headers = config.headers
+        
+#         URL = "https://bluearchive.wiki/wiki/Characters"
+        
+#         response = requests.get(URL, headers=headers)
+#         soup = BeautifulSoup(response.text, "html.parser")
+
+#         table = soup.find_all("table")[0]
+#         tbody = table.find_all("tbody")[0]
+#         trList = tbody.find_all("tr")
+#         trList = trList[1:]  # 헤더 제거
+        
+#         students_by_school = defaultdict(lambda: defaultdict(list))
+        
+#         for tr in trList:
+#             tdList = tr.find_all("td")
+#             name = tdList[1].get_text(strip=True)
+#             school = tdList[3].get_text(strip=True)
+            
+#             if '(' in name:
+#                 base_name = name.split(' (')[0]
+#                 students_by_school[school][base_name].append(name)
+#             else:
+#                 students_by_school[school][name].append(name)
+
+#         # defaultdict를 일반 dict로 변환
+#         for school in students_by_school:
+#             students_by_school[school] = dict(students_by_school[school])
+
+#         students_data = dict(students_by_school)
+#         schools_list = list(students_data.keys())     #학교 목록
+#         total_students = sum(len(students) for students in students_data.values())
+        
+#         # 성공 시 True와 함께 기존 3개 값 반환
+#         return True, schools_list, students_data, total_students, None
+        
+#     except Exception as e:
+#         # 실패 시 False만 반환
+#         print(f"Error in get_student_list: {e}")
+#         return False, None, None, None, e
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from util.config import Config
+from util.parserSetup import parserSetup
+
+config = Config()
+
+headers = config.headers
+
+URL = "https://bluearchive.wiki/wiki/Characters"
+
+def get_student_list(URL):
     try:
-        # 설정 및 헤더 로드
         sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
         from util.config import Config
-        config = Config()
-        headers = config.headers
         
-        URL = "https://bluearchive.wiki/wiki/Characters"
-        
-        response = requests.get(URL, headers=headers)
+        response = requests.get(URL, headers=Config().headers)
         soup = BeautifulSoup(response.text, "html.parser")
-
-        table = soup.find_all("table")[0]
-        tbody = table.find_all("tbody")[0]
-        trList = tbody.find_all("tr")
-        trList = trList[1:]  # 헤더 제거
         
         students_by_school = defaultdict(lambda: defaultdict(list))
         
-        for tr in trList:
-            tdList = tr.find_all("td")
-            name = tdList[1].get_text(strip=True)
-            school = tdList[3].get_text(strip=True)
+        for tr in soup.find("table").find("tbody").find_all("tr")[1:]:
+            td_list = tr.find_all("td")
+            name = td_list[1].get_text(strip=True)
+            school = td_list[3].get_text(strip=True)
             
-            if '(' in name:
-                base_name = name.split(' (')[0]
-                students_by_school[school][base_name].append(name)
-            else:
-                students_by_school[school][name].append(name)
-
-        # defaultdict를 일반 dict로 변환
-        for school in students_by_school:
-            students_by_school[school] = dict(students_by_school[school])
-
-        students_data = dict(students_by_school)
-        schools_list = list(students_data.keys())     #학교 목록
+            base_name = name.split(' (')[0] if '(' in name else name
+            students_by_school[school][base_name].append(name)
+        
+        students_data = {school: dict(students) for school, students in students_by_school.items()}
+        schools_list = list(students_data.keys())
         total_students = sum(len(students) for students in students_data.values())
         
-        # 성공 시 True와 함께 기존 3개 값 반환
-        return True, schools_list, students_data, total_students, None
+        return True, schools_list, students_data, total_students
         
-    except Exception as e:
-        # 실패 시 False만 반환
-        print(f"Error in get_student_list: {e}")
-        return False, None, None, None, e
-
+    except:
+        error_traceback = traceback.format_exc()
+        print(f"Error in get_student_list:\n{error_traceback}")
+        return False, None, None, None
+    
 if __name__ == "__main__":
-    result = get_student_list()
+    result = get_student_list(URL)
     
     if result[0]:  # 성공한 경우
         success, schools_list, students_data, total_students,  _= result

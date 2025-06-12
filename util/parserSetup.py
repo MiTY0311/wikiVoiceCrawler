@@ -1,8 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 
-from config import Config
-config = Config()
+# from config import Config
+# config = Config()
 
 def parserSetup(URL):
 

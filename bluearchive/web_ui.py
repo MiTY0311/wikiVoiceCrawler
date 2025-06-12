@@ -64,7 +64,8 @@ def download_dataset(school, student, version):
 
 def load_student_data():
     """학생 데이터 로드"""
-    success, schools_list, students_data, total_students, error = get_student_list()
+    # get_student_list 함수는 이제 4개의 값만 반환합니다.
+    success, schools_list, students_data, total_students = get_student_list()
     
     if success:
         return (
@@ -75,7 +76,8 @@ def load_student_data():
             gr.update(visible=True)  # selection_panel 표시
         )
     else:
-        error_msg = f"❌ 로드 실패: {str(error)}" if error else "❌ 로드 실패: 알 수 없는 오류"
+        # 에러 메시지를 직접 터미널 확인 요청으로 변경
+        error_msg = "❌ 로드 실패: 터미널에서 에러 로그를 확인하세요."
         return (
             False,
             None,

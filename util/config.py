@@ -9,6 +9,7 @@ outputPath= "output"
 main_port = 7680
 bluearchive_port = 7681
 honkaistarrail_port = 7682
+genshin_port = 7683
 
 class Config:
     def __init__(self):
@@ -18,3 +19,4 @@ class Config:
         self.main_port = main_port
         self.bluearchive_port = bluearchive_port
         self.honkaistarrail_port = honkaistarrail_port
+        self.genshin_port = genshin_port

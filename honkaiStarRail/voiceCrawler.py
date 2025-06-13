@@ -5,27 +5,29 @@ import traceback
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.parserSetup import parserSetup
 
-def voice_crawler(character,language):
-    URL = "https://honkai-star-rail.fandom.com/wiki/"
+def voice_crawler(character):
+    URL = f"https://honkai-star-rail.fandom.com/wiki/{character}/Voice-Overs/Japanese"
     soup = parserSetup(URL)
-    div = soup.find_all("div", class_="custom-tabs-language custom-tabs")
+    tables = soup.find_all("table", class_="wikitable")
 
-    languages = []
-    default = div[0].find_all("strong", class_="mw-selflink selflink")
-    languages.append(default[0].text)
-    div = div[0].find_all("a")
-    for language in div:
-        languages.append(language.text)
+    for table_idx, table in enumerate(tables):
+        print(f"\n테이블 {table_idx+1} 처리 중...")
 
-    if len(languages)==4:
-        pass
-    else:
-        return "1"
+        tbody = table.find_all("tbody")
+        trs = tbody[0].find_all("tr")[1:][1::2]
+
+        
+        
+        pprint(trs[1])
+        print(len(trs))
+    # print(len(table))
+
+
     
     # language=""
 
 
     return None
 
-character = "Natasha"
+character = "Acheron"
 print(voice_crawler(character))

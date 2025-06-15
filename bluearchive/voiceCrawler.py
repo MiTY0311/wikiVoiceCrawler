@@ -65,7 +65,6 @@ def voice_crawler(character):
                 parsingAudios = tds[1]             # 오디오소스
                 parsingTexts = tds[2]              # jp텍스트
                 
-                # 텍스트 파싱
                 # texts = []
                 texts = deque()
                 for t in parsingTexts.find_all("p"):

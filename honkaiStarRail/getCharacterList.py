@@ -43,15 +43,16 @@ def languages(character):
         URL = f"https://honkai-star-rail.fandom.com/wiki/{character}/Voice-Overs"
         soup = parserSetup(URL)
         div = soup.find_all("div", class_="custom-tabs-language custom-tabs")
-
+        
+        default = div[0].find_all("strong", class_="mw-selflink selflink")          # fandom 위키는 무조건 영어가 디폴트
+        
         languages = []
-        default = div[0].find_all("strong", class_="mw-selflink selflink")
-        # print(default)
-        languages.append(default[0].text)
+        languages.append(default[0].text)                                           # 나머지 존재하는 다른 언어의 데이터셋 서치
         div = div[0].find_all("a")
-        print(div)
+
         for language in div:
             languages.append(language.text)
+
         return True, languages
     except:
         error_traceback = traceback.format_exc()
@@ -60,6 +61,7 @@ def languages(character):
     
 asdf, lst = get_character_list()
 pprint(lst)
-# asdf, langs = languages("Acheron")
+asdf, langs = languages("Acheron")
+print(langs)
 
 

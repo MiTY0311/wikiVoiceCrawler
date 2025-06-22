@@ -1,7 +1,12 @@
-import os
+import os, sys
 import shutil
 
-def setup(path, name):
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from util.config import Config
+config = Config()
+path = config.path
+
+def setup(name):
 
     char_path = os.path.join(path, name)
     if os.path.exists(char_path):
@@ -14,21 +19,17 @@ def setup(path, name):
     os.makedirs(char_path, exist_ok=True)
     
     # 오디오
-    download_dir = os.path.join(char_path, "audio")
-    os.makedirs(download_dir, exist_ok=True)
+    download = os.path.join(char_path, "audio")
+    os.makedirs(download, exist_ok=True)
     
     # 오디오 temp
-    temp_dir = os.path.join(char_path, "temp")
-    os.makedirs(temp_dir, exist_ok=True)
+    temp = os.path.join(char_path, "temp")
+    os.makedirs(temp, exist_ok=True)
     
     # txt
-    txt_path = os.path.join(char_path, f"{name}.txt")
-    with open(txt_path, 'w', encoding='utf-8') as f:
-        pass
-
-    # log
-    log_path = os.path.join(char_path, "log.txt")
-    with open(log_path, 'w', encoding='utf-8') as f:
+    txt = os.path.join(char_path, f"{name}.txt")
+    with open(txt, 'w', encoding='utf-8') as f:
         pass
     
-    return download_dir, temp_dir, txt_path, log_path
+    # return download_path, temp_path, txt_path
+    return download, temp, txt

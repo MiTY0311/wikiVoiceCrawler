@@ -1,38 +1,25 @@
-import requests
-from bs4 import BeautifulSoup
+# wiki pedia
+
 from collections import deque
-# from urllib.parse import urljoin
 import os, sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from util.config import Config
-from util.audioHandler import audios_to_dataset
+from util.parserSetup import parserSetup
+from util.audioHandler import create_dataset
 from util.pathManager import setup
 
 def voice_crawler(character):
-    
-    BASE_URL = "https://bluearchive.wiki"
-    PAGE_URL = f"{BASE_URL}/wiki/{character}/audio"
-    
-    # 설정 및 경로 초기화
-    config = Config()
-    headers = config.headers
-    path = config.outputPath
-    
-    downloadPath, tempPath, txtPath, logPath = setup(path, character)
-    
+
+    download, temp, txt = setup(character)
+
+    URL = f"https://bluearchive.wiki/wiki/{character}/audio"    
     # 데이터 저장용 리스트 초기화
     txtList = deque()
     log = []
-    
+
     try:
-        response = requests.get(PAGE_URL, headers=headers)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = parserSetup(URL)
         tables = soup.find_all("table")
-        
-        print(f"찾은 테이블 수: {len(tables)}")
-        
         success_count = 0
         
         # 각 테이블 처리
@@ -53,8 +40,7 @@ def voice_crawler(character):
                 continue
                 
             print(f"테이블 {table_idx+1}에서 {len(data)}개의 행을 찾았습니다.")
-            
-            # 각 행 처리
+
             for row_idx, row in enumerate(data):
                 tds = row.find_all("td")
                 if len(tds) < 4:
@@ -65,7 +51,6 @@ def voice_crawler(character):
                 parsingAudios = tds[1]             # 오디오소스
                 parsingTexts = tds[2]              # jp텍스트
                 
-                # texts = []
                 texts = deque()
                 for t in parsingTexts.find_all("p"):
                     text_content = t.get_text(separator="", strip=True)
@@ -88,74 +73,40 @@ def voice_crawler(character):
                 urls = []
                 
                 for source in audios:
+                    # 오디오 ogg랑 mp3중 mp3만 가져오는 코드
                     if source.get("type") == "audio/mpeg":
                         url = "https:" + source.get("src")
                         urls.append(url)
-                
-                # 오디오 URL이 없는 경우 건너뛰기
+
                 if not urls:
                     print(f"행 {row_idx+1}({tag})에서 오디오 URL을 찾을 수 없습니다. 건너뜁니다.")
-                    log.append({
-                        "table": table_idx+1,
-                        "row": row_idx+1,
-                        "tag": tag,
-                        "reason": "오디오 URL 없음"
-                    })
                     continue
-
-                print(f"처리 중: {tag}")
                 
-                # 오디오 다운로드 및 데이터셋 생성
-                success, output_path, audioText = audios_to_dataset(
-                    headers,
-                    urls,
-                    tag,
-                    tempPath,
-                    downloadPath,
-
-                    character,
-                    texts,
-                )
+                # 경로로 경로 생성 후 데이터셋 생성
+                success, audioText = create_dataset(urls, download, temp, character, tag, texts)
                 
                 if success:
                     txtList.append(audioText)
                     success_count += 1
 
-                    print(f"처리 완료 {tag}")
-                    print("text : ",audioText)
+                    print("처리 완료 : ",audioText)
+                else:
+                    print("asdf")
 
-        with open(txtPath, 'w', encoding='utf-8') as f:
+        with open(txt, 'w', encoding='utf-8') as f:
             for entry in txtList:
                 f.write(entry + '\n')
 
-        if log:
-            with open(logPath, 'w', encoding='utf-8') as f:
-                for item in log:
-                    f.write(f"테이블 {item['table']}, 행 {item['row']}, 태그: {item['tag']}, 이유: {item['reason']}\n")
-    
-
-        print(f"\n=== 크롤링 완료 ===")
-        print(f"성공한 항목: {success_count}개")
-        print(f"건너뛴 항목: {len(log)}개")
-        print(f"데이터셋 파일: {txtPath}")
-        print(f"로그 파일: {logPath}")
+        return True, f"{success_count}개의 오디오와 텍스트 데이터셋을 생성했습니다."
         
-        return True, success_count, len(log), log
-        
-    except requests.exceptions.RequestException as e:
-        print(f"HTTP 요청 실패: {e}")
-        return False, 0, 0, []
     except Exception as e:
-        print(f"크롤링 중 오류 발생: {e}")
-        return False, 0, 0, []
+        import traceback
+        e= traceback.format_exc()
+        print(f"Error in voice_crawler:\n{e}")
+        return False, "에러가 발생했습니다. 터미널에서 에러를 확인해주세요."
     
-# 출력 예시
-# print("\n=== 파싱 결과 ===")
-# pprint(result[:5])  # 처음 5개 항목만 출력 (결과가 너무 많을 경우)
-# print(f"... 외 {max(0, len(result)-5)}개 항목 (총 {len(result)}개)")
+if __name__ == "__main__":
 
-# print(f"\n총 {len(result)}개 항목 처리 완료")
-# print(f"건너뛴 항목: {len(log)}개 (자세한 내용은 {log} 파일 참조)")
-# print(f"오디오 파일 저장 위치: {os.path.abspath(download)}")
-# print(f"데이터셋 파일 저장 위치: {os.path.abspath(dataset_file)}")
-# print(f"데이터셋 항목 수: {len(dataset_entries)}개")
+    character = "Mika"
+    result = voice_crawler(character)
+    

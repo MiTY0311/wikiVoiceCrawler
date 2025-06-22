@@ -4,7 +4,7 @@ headers = {
 }
 
 # 다운로드 기본경로
-outputPath= "output"
+path= "output"
 
 main_port = 7680
 bluearchive_port = 7681
@@ -14,7 +14,7 @@ genshin_port = 7683
 class Config:
     def __init__(self):
         self.headers = headers
-        self.outputPath = outputPath
+        self.path = path
 
         self.main_port = main_port
         self.bluearchive_port = bluearchive_port

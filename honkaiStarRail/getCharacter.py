@@ -5,12 +5,12 @@ import traceback
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.parserSetup import parserSetup
 
-def get_character_list():
+def getCharacters():
     try:
         URL = "https://honkai-star-rail.fandom.com/wiki/Character"
         soup = parserSetup(URL)
 
-        characters_by_group = {}
+        data = {}
 
         trs=[]
         all_classes = ['nowraplinks', 'hlist', 'thc1', 'mw-collapsible', 'navbox-inner', 'mw-made-collapsible']
@@ -25,14 +25,26 @@ def get_character_list():
         
         for tr in trs:
             group = tr.find("th").find("a").text
-            characters_by_group[group] = []
+            data[group] = []
             span_list = tr.find_all("span", class_="card-image-container")
             for span in span_list:
                 img = span.find("img")
                 name = img["alt"]
-                characters_by_group[group].append(name)
+                if name == "Trailblazer":
+                    continue
+                data[group].append(name)
+        
+        print(data)
+        data = {faction: list(data) for faction, data in data.items()}
+        # print(data)
+        groups =  list(data.keys())
+        print(groups)
+        # total = set()
+        # for character in data.values():
+        #     total.update(character)
+        # total = len(total)
 
-        return True, characters_by_group
+        return True, data
     except:
         error_traceback = traceback.format_exc()
         print(f"Error in get_student_list:\n{error_traceback}")
@@ -59,9 +71,7 @@ def languages(character):
         print(f"Error in get_student_list:\n{error_traceback}")
         return False, None
     
-asdf, lst = get_character_list()
-pprint(lst)
-asdf, langs = languages("Acheron")
-print(langs)
-
-
+if __name__ == "__main__":
+    result, data = getCharacters()
+    # character = characters['Astral Express'][2]
+    # a, b = languages(character)

@@ -1,16 +1,16 @@
 import requests
 from bs4 import BeautifulSoup
 
-# from config import Config
-# config = Config()
+import os, sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from util.config import Config
+
+config = Config()
+headers = config.headers
 
 def parserSetup(URL):
 
-    headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
-
-    response = requests.get(URL, headers)
+    response = requests.get(URL, headers=headers)
     soup = BeautifulSoup(response.text, "html.parser")
 
     return soup

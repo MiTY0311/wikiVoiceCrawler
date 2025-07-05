@@ -1,18 +1,3 @@
-css = """
-.title { 
-    text-align: center; 
-    padding: 20px; 
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-    border-radius: 10px; 
-    color: white; 
-}
-.game-btn { 
-    height: 80px !important; 
-    font-size: 18px !important; 
-    margin: 10px !important; 
-}
-"""
-
 import gradio as gr
 import os
 import sys
@@ -20,91 +5,179 @@ import sys
 # 모듈 import
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.config import Config
-from bluearchive.getCharacters import getCharacters
+from blueArchive.getCharacters import getCharacters
 from voiceCrawler import voice_crawler
 
 config = Config()
 
-def load_data():
-    """학생 데이터 로드"""
+# 전역 상태
+class AppState:
+    def __init__(self):
+        self.characters = None
+        self.selected_school = None
+        self.selected_character = None
+
+state = AppState()
+
+def limit_selection(items):
+    """체크박스에서 하나만 선택되도록 제한"""
+    return [items[-1]] if len(items) > 1 else items
+
+def create_update(choices=None, value=None, visible=None):
+    """gr.update 객체 생성 헬퍼"""
+    update_dict = {}
+    if choices is not None:
+        update_dict['choices'] = choices
+    if value is not None:
+        update_dict['value'] = value
+    if visible is not None:
+        update_dict['visible'] = visible
+    return gr.update(**update_dict)
+
+def load_characters():
+    """캐릭터 데이터 자동 로드"""
     success, data = getCharacters()
-    
-    if success:
-        characters = {group: dict(characters) for group, characters in data.items()}
-        groups = list(characters.keys())
-        total = sum(len(v) for v in characters.values())
-        
-        status_msg = f"✅ 로드 완료! {len(groups)}개 학교, {total}명 학생"
-        choices = ["-"] + sorted(groups)
-        return (characters, status_msg, 
-                gr.update(choices=choices, visible=True),
-                gr.update(visible=True))
-    else:
-        return (None, "", 
-                gr.update(visible=False), gr.update(visible=False))
 
-def update_students(groups, characters):
-    """학원 선택 시 학생 목록 업데이트"""
-    if not characters or groups == "-":
-        return gr.update(choices=["전체"], visible=False), gr.update(visible=False)
+    print(data)
     
-    students = ["전체"] + sorted(characters.get(groups, {}).keys())
-    return (gr.update(choices=students, value="전체", visible=True),
-            gr.update(visible=False))
-
-def update_versions(groups, student, characters):
-    """학생 선택 시 버전 목록 업데이트"""
-    if not characters or student == "전체" or groups == "-":
-        return gr.update(visible=False), gr.update(visible=False)
+    if not success:
+        return ("❌ 데이터 로드 실패", 
+                create_update(choices=[], value=[]), 
+                create_update(visible=False), 
+                create_update(visible=False), 
+                create_update(visible=False))
     
-    versions = characters.get(groups, {}).get(student, [])
-    if versions:
-        return (gr.update(choices=versions, value=versions[0], visible=True),
-                gr.update(visible=True))
-    return gr.update(visible=False), gr.update(visible=False)
+    state.characters = {group: dict(chars) for group, chars in data.items()}
+    sch = list(state.characters.keys())
+    total = sum(len(v) for v in state.characters.values())
+    
+    return (f"✅ 로드 완료! {len(sch)}개 학교, {total}명 학생",
+            create_update(choices=sch, value=[]),
+            create_update(visible=True),
+            create_update(visible=False), 
+            create_update(visible=False))
 
-def download_voice(groups, student, version):
+def handle_school_select(schools):
+    schools = limit_selection(schools)
+    state.selected_character = None
+    
+    if not schools or not state.characters:
+        state.selected_school = None
+        return (create_update(value=schools),
+                create_update(choices=[], value=[]), 
+                create_update(visible=False),
+                create_update(choices=[], value=[]), 
+                create_update(visible=False))
+    
+    state.selected_school = schools[0]
+    characters = list(state.characters[state.selected_school].keys())
+    
+    return (create_update(value=schools),
+            create_update(choices=characters, value=[]), 
+            create_update(visible=True),
+            create_update(choices=[], value=[]), 
+            create_update(visible=False))
+
+def handle_character_select(characters_selected):
+    characters_selected = limit_selection(characters_selected)
+    
+    if not characters_selected or not state.selected_school or not state.characters:
+        state.selected_character = None
+        return (create_update(value=characters_selected),
+                create_update(choices=[], value=[]), 
+                create_update(visible=False))
+    
+    state.selected_character = characters_selected[0]
+    versions = state.characters[state.selected_school][state.selected_character]
+    
+    return (create_update(value=characters_selected),
+            create_update(choices=versions, value=[]), 
+            create_update(visible=True))
+
+def handle_version_select(versions):
+    """버전 선택 시 다운로드 버튼 표시"""
+    show = bool(versions)
+    return create_update(visible=show), create_update(visible=show)
+
+def download_voices(versions_selected):
     """음성 데이터 다운로드"""
-    if not all([groups, student, version]) or groups == "-" or student == "전체":
-        return "❌ 학원, 학생, 버전을 모두 선택해주세요."
+    if not all([state.selected_school, state.selected_character, versions_selected]):
+        return "❌ 학교, 캐릭터, 버전을 모두 선택해주세요."
     
-    try:
-        character_name = version.replace(' ', '_')
-        start_msg = f"🚀 {groups}의 {student} ({version}) 크롤링 시작...\n"
-        success, msg = voice_crawler(character_name)
-        return start_msg + f"성공 여부: {success}\n{msg}"
-    except:
-        return "❌ 예상치 못한 오류 발생!"
+    results = []
+    for version in versions_selected:
+        try:
+            success, msg = voice_crawler(version.replace(' ', '_'))
+            status = "✅" if success else "❌"
+            results.append(f"{status} {state.selected_school}의 {state.selected_character} ({version}): {msg}")
+        except Exception as e:
+            results.append(f"❌ {state.selected_character} ({version}): 다운로드 오류 - {str(e)}")
+    
+    return "\n".join(results)
 
-# 메인 인터페이스
+# CSS 스타일
+css = """
+.title { 
+    text-align: center; 
+    padding: 20px; 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+    border-radius: 10px; 
+    color: white; 
+    margin-bottom: 20px;
+}
+.checkbox-group {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 10px 0;
+}
+.step-title {
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 10px;
+    color: #333;
+}
+"""
+
+# UI 구성
 with gr.Blocks(css=css, title="wikiVoiceCrawler") as demo:
-    # 헤더
-    gr.HTML('<div class="title"><h1>🎮 wikiVoiceCrawler</h1><p>위키 음성 크롤러</p></div>')
+    gr.HTML('<div class="title"><h1>Blue Archive Make Dataset Tool</h1></div>')
     
-    characters = gr.State(None)
+    # 상태 표시
+    status = gr.Textbox(label="상태", value="📡 캐릭터 데이터 로딩 중...", interactive=False)
     
-    # 데이터 로드 섹션
-    with gr.Row():
-        with gr.Column(scale=1, min_width=150):
-            load_btn = gr.Button("📚\n학생\n데이터\n불러오기", 
-                               variant="primary", elem_classes="square-btn")
-        with gr.Column(scale=3):
-            status = gr.Textbox(label="상태", value="데이터를 불러오세요", interactive=False)
+    # 선택 단계들
+    with gr.Column():
+        # 학교 선택
+        with gr.Group(visible=False) as sch_is_active:
+            sch_list = gr.CheckboxGroup(label="학교", choices=[], elem_classes=["checkbox-group"])
+        
+        # 캐릭터 선택
+        with gr.Group(visible=False) as char_is_active:
+            char_list = gr.CheckboxGroup(label="캐릭터", choices=[], elem_classes=["checkbox-group"])
+        
+        # 버전 선택
+        with gr.Group(visible=False) as ver_is_active:
+            ver_list = gr.CheckboxGroup(label="버전", choices=[], elem_classes=["checkbox-group"])
     
-    with gr.Column(visible=False) as panel:
-        school = gr.Dropdown(label="🏛️ 학원", choices=["-"], value="-")
-        student = gr.Dropdown(label="👤 학생", visible=False)
-        version = gr.Dropdown(label="🎭 버전", visible=False)
-        download_btn = gr.Button("⬇️ 다운로드", variant="secondary", visible=False)
-        result = gr.Textbox(label="결과", interactive=False)
+    # 다운로드 섹션
+    download_btn = gr.Button("📁 데이터셋 생성", variant="primary", size="lg", visible=False)
+    result = gr.Textbox(label="다운로드 결과", interactive=False, lines=5, visible=False)
     
     # 이벤트 연결
-    load_btn.click(load_data, outputs=[characters, status, school, panel])
-
-    school.change(update_students, [school, characters], [student, download_btn])
-    student.change(update_versions, [school, student, characters], [version, download_btn])
-    version.change(lambda v: gr.update(visible=bool(v)), [version], [download_btn])
-    download_btn.click(download_voice, [school, student, version], [result])
+    demo.load(load_characters, outputs=[status, sch_list, sch_is_active, char_is_active, ver_is_active])
+    
+    sch_list.change(handle_school_select, [sch_list], 
+                        [sch_list, char_list, char_is_active, ver_list, ver_is_active])
+    
+    char_list.change(handle_character_select, [char_list], 
+                           [char_list, ver_list, ver_is_active])
+    
+    ver_list.change(handle_version_select, [ver_list], [download_btn, result])
+    
+    download_btn.click(download_voices, [ver_list], [result])
 
 if __name__ == "__main__":
     print(f"🚀 웹 UI 시작: http://localhost:{config.bluearchive_port}")

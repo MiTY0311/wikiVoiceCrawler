@@ -31,7 +31,6 @@ def create_dataset(urls, download, temp, character, tag, texts):
             mp3_data = BytesIO(response.content)
             mp3_audio = AudioSegment.from_file(mp3_data, format=format)
             
-            # 임시 WAV 파일 저장
             wav_path = Path(temp) / f"{tag}_{i+1:03d}.wav"
             mp3_audio.export(wav_path, format="wav")
             wav_files.append(wav_path)
@@ -39,14 +38,12 @@ def create_dataset(urls, download, temp, character, tag, texts):
         if not wav_files:
             return False, None, None
         
-        # WAV 파일 병합
         combined = AudioSegment.from_file(wav_files[0])
         silence = AudioSegment.silent(duration=500)
         for wav_file in wav_files[1:]:
             combined += silence
             combined += AudioSegment.from_file(wav_file)
         
-        # 최종 파일 저장
         output_filename = f"{tag}.wav"
         output_path = Path(download) / output_filename
         combined.export(output_path, format="wav")

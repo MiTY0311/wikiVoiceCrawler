@@ -1,7 +1,4 @@
 import os, sys
-from pprint import pprint
-import traceback
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.parserSetup import parserSetup
 
@@ -26,6 +23,7 @@ def get_character_list():
         return characters_by_group, total
     
     except:
+        import traceback
         error_traceback = traceback.format_exc()
         print(f"Error in get_student_list:\n{error_traceback}")
         return False, None

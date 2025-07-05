@@ -1,7 +1,5 @@
 from collections import defaultdict
-import traceback
 import os, sys
-from pprint import pprint
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.parserSetup import parserSetup
@@ -23,7 +21,7 @@ def getCharacters():
         
         return True, data
         
-    except Exception as e:
+    except:
         import traceback
         error_traceback = traceback.format_exc()
         print(f"Error in voice_crawler:\n{error_traceback}")
@@ -34,7 +32,11 @@ if __name__ == "__main__":
     result = getCharacters()
     
     if result[0]:
-        success, groups, characters, total= result
-        pprint(f"성공: {len(groups)}개 학교, {total}명 학생")
+        success, data= result
+        characters = {group: dict(characters) for group, characters in data.items()}
+        groups = list(characters.keys())
+        total = sum(len(v) for v in characters.values())
+        from pprint import pprint
+        pprint(characters)
     else:  # 실패한 경우
         print("학생 데이터 로드 실패")

@@ -1,7 +1,4 @@
 import os, sys
-from pprint import pprint
-import traceback
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from util.parserSetup import parserSetup
 
@@ -34,21 +31,13 @@ def getCharacters():
                     continue
                 data[group].append(name)
         
-        print(data)
-        data = {faction: list(data) for faction, data in data.items()}
         # print(data)
-        groups =  list(data.keys())
-        print(groups)
-        # total = set()
-        # for character in data.values():
-        #     total.update(character)
-        # total = len(total)
-
-        return True, data
+        return True, data, None
     except:
-        error_traceback = traceback.format_exc()
-        print(f"Error in get_student_list:\n{error_traceback}")
-        return False, None
+        import traceback
+        e = traceback.format_exc()
+        print(f"Error in get_student_list:\n{e}")
+        return False, None, "error"
 
 def languages(character):
     try:
@@ -65,11 +54,12 @@ def languages(character):
         for language in div:
             languages.append(language.text)
 
-        return True, languages
+        return True, languages, None
     except:
+        import traceback
         error_traceback = traceback.format_exc()
         print(f"Error in get_student_list:\n{error_traceback}")
-        return False, None
+        return False, None, "error"
     
 if __name__ == "__main__":
     result, data = getCharacters()

@@ -93,10 +93,10 @@ def voice_crawler(character):
                 else:
                     print("asdf")
 
-        with open(txt, 'w', encoding='utf-8') as f:
-            for entry in txtList:
-                f.write(entry + '\n')
-
+            with open(txt, 'w', encoding='utf-8') as f:
+                for entry in txtList:
+                    f.write(entry + '\n')
+        print("파싱 완료")
         return True, f"{success_count}개의 오디오와 텍스트 데이터셋을 생성했습니다."
         
     except Exception as e:
@@ -106,7 +106,14 @@ def voice_crawler(character):
         return False, "에러가 발생했습니다. 터미널에서 에러를 확인해주세요."
     
 if __name__ == "__main__":
-
+    import time
     character = "Mika"
-    result = voice_crawler(character)
+    
+    start_time = time.time()
+    success, message = voice_crawler(character)
+    end_time = time.time()
+    execution_time = end_time - start_time
+    
+    print(f"실행 결과: {message}")
+    print(f"총 실행 시간: {execution_time:.2f}초")
     
